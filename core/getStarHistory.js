@@ -13,6 +13,11 @@ const range = (n) => Array.apply(null, { length: n }).map((_, i) => i + 1);
  * @return {Array} history - eg: [{date: 2015-3-1,starNum: 12}, ...]
  */
 async function getStarHistory(repo, token) {
+  var storedHistory = localStorage.getItem(repo);
+  if (storedHistory) {
+    storedHistory = JSON.parse(storedHistory);
+    return storedHistory;
+  }
   const axiosGit = axios.create({
     headers: {
       Accept: "application/vnd.github.v3.star+json",
@@ -54,12 +59,10 @@ async function getStarHistory(repo, token) {
     );
 
     console.log("pageIndexes", pageIndexes);
-    return { firstPage: initRes, sampleUrls, pageIndexes, pageNum,initUrl };
+    return { firstPage: initRes, sampleUrls, pageIndexes, pageNum, initUrl };
   }
 
-  const { initUrl, sampleUrls, pageIndexes, firstPage, pageNum } = await generateUrls(
-    repo
-  );
+  const { initUrl, pageNum } = await generateUrls(repo);
 
   let res = [];
   const EightMonth = 60000 * 60 * 24 * 30 * 8;
@@ -67,7 +70,7 @@ async function getStarHistory(repo, token) {
   for (var i = 0; i < pageNum; i++) {
     const url = `${initUrl}?page=${i}`;
     let c = false;
-    const result = await axiosGit.get(url).catch(err => {
+    const result = await axiosGit.get(url).catch((err) => {
       c = true;
     });
     if (c) {
@@ -77,27 +80,55 @@ async function getStarHistory(repo, token) {
       limit = new Date(result.data[0].starred_at).getTime() + EightMonth;
     }
     let b = false;
-    result.data.forEach(star => {
+    result.data.forEach((star) => {
       if (new Date(star.starred_at).getTime() >= limit) {
         b = true;
         return;
       }
       res.push(star);
-      console.log(res.length)
+      console.log(res.length);
     });
     if (b) {
       break;
     }
   }
 
-  console.log(res);
+  let dateMap = {};
+  res.forEach((point) => {
+    dateMap[point.starred_at.slice(0, 7)] =
+      dateMap[point.starred_at.slice(0, 7)] || [];
+    dateMap[point.starred_at.slice(0, 7)].push(point);
+  });
+  let history = [
+    {
+      data: 0,
+      starNum: 0,
+    },
+  ];
+  let totolCount = 0;
+  Object.keys(dateMap)
+    .sort()
+    .forEach((key, i) => {
+      totolCount += dateMap[key].length;
+      history.push({
+        date: i,
+        starNum: totolCount,
+      });
+    });
+
+  if (repo === "milvus-io/milvus") {
+    history.splice(1, 1);
+  }
+
+  localStorage.setItem(repo, JSON.stringify(history));
+
+  console.log(dateMap);
 
   // promises to request sampleUrls
 
   // const getArray = [firstPage].concat(
   //   sampleUrls.map((url) => axiosGit.get(url))
   // );
-  let starHistory = null;
 
   // const resArray = await Promise.all(getArray);
 
@@ -154,7 +185,7 @@ async function getStarHistory(repo, token) {
   // //   starNum: starNumToday
   // // })
 
-  return starHistory;
+  return history;
 }
 
 export default getStarHistory;

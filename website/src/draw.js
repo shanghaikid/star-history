@@ -9,13 +9,13 @@ export default function draw(datasets) {
   new chartXkcd.XY(svg, {
     title: 'Star history',
     yLabel: 'Github stars',
-    xLabel: 'Start month',
-    labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+    xLabel: 'Months since debute',
+    labels: ['0', '1', '2', '3', '4', '5', '6', '7', '8'],
     data: {
       datasets
     },    
     options: {
-      xTickCount: 10,
+      xTickCount: 9,
       yTickCount: 5,
       legendPosition: chartXkcd.config.positionType.upLeft,
       showLine: true,
