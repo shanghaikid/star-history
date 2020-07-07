@@ -1,10 +1,10 @@
-import axios from 'axios';
+import axios from "axios";
 
 // number of sample requests to do
 const sampleNum = 15;
 
 // return [1,2, ..., n]
-const range = n => Array.apply(null, {length: n}).map((_, i) => i + 1);
+const range = (n) => Array.apply(null, { length: n }).map((_, i) => i + 1);
 
 /**
  * get star history
@@ -15,7 +15,7 @@ const range = n => Array.apply(null, {length: n}).map((_, i) => i + 1);
 async function getStarHistory(repo, token) {
   const axiosGit = axios.create({
     headers: {
-      Accept: 'application/vnd.github.v3.star+json',
+      Accept: "application/vnd.github.v3.star+json",
       Authorization: token ? `token ${token}` : undefined,
     },
   });
@@ -26,15 +26,14 @@ async function getStarHistory(repo, token) {
    * @return {object} {sampleUrls, pageIndexes} - urls to be fatched(length <=10) and page indexes
    */
   async function generateUrls(repo) {
-
-    const initUrl = `https://api.github.com/repos/${repo}/stargazers`;   // used to get star info
+    const initUrl = `https://api.github.com/repos/${repo}/stargazers`; // used to get star info
     const initRes = await axiosGit.get(initUrl);
 
-    /** 
+    /**
      * link Sample (no link when star < 30):
      * <https://api.github.com/repositories/40237624/stargazers?access_token=2e71ec1017dda2220ccba0f6922ecefd9ea44ac7&page=2>;
-     * rel="next", 
-     * <https://api.github.com/repositories/40237624/stargazers?access_token=2e71ec1017dda2220ccba0f6922ecefd9ea44ac7&page=4>; 
+     * rel="next",
+     * <https://api.github.com/repositories/40237624/stargazers?access_token=2e71ec1017dda2220ccba0f6922ecefd9ea44ac7&page=4>;
      * rel="last"
      */
     const link = initRes.headers.link;
@@ -42,73 +41,118 @@ async function getStarHistory(repo, token) {
     const pageNum = link ? /next.*?page=(\d*).*?last/.exec(link)[1] : 1; // total page number
 
     // used to calculate total stars for this page
-    const pageIndexes = pageNum <= sampleNum ?
-      range(pageNum).slice(1, pageNum) :
-      range(sampleNum).map(n => Math.round(n / sampleNum * pageNum) - 1); // for bootstrap bug
+    const pageIndexes =
+      pageNum <= sampleNum
+        ? range(pageNum).slice(1, pageNum)
+        : range(sampleNum).map(
+            (n) => Math.round((n / sampleNum) * pageNum) - 1
+          ); // for bootstrap bug
 
     // store sampleUrls to be requested
-    const sampleUrls = pageIndexes.map(pageIndex => `${initUrl}?page=${pageIndex}`);
+    const sampleUrls = pageIndexes.map(
+      (pageIndex) => `${initUrl}?page=${pageIndex}`
+    );
 
     console.log("pageIndexes", pageIndexes);
-    return { firstPage: initRes, sampleUrls, pageIndexes };
+    return { firstPage: initRes, sampleUrls, pageIndexes, pageNum,initUrl };
   }
 
-  const { sampleUrls, pageIndexes, firstPage } = await generateUrls(repo);
+  const { initUrl, sampleUrls, pageIndexes, firstPage, pageNum } = await generateUrls(
+    repo
+  );
+
+  let res = [];
+  const EightMonth = 60000 * 60 * 24 * 30 * 8;
+  let limit = 0;
+  for (var i = 0; i < pageNum; i++) {
+    const url = `${initUrl}?page=${i}`;
+    let c = false;
+    const result = await axiosGit.get(url).catch(err => {
+      c = true;
+    });
+    if (c) {
+      continue;
+    }
+    if (limit === 0) {
+      limit = new Date(result.data[0].starred_at).getTime() + EightMonth;
+    }
+    let b = false;
+    result.data.forEach(star => {
+      if (new Date(star.starred_at).getTime() >= limit) {
+        b = true;
+        return;
+      }
+      res.push(star);
+      console.log(res.length)
+    });
+    if (b) {
+      break;
+    }
+  }
+
+  console.log(res);
 
   // promises to request sampleUrls
 
-  const getArray = [firstPage].concat(sampleUrls.map(url => axiosGit.get(url)));
-
-  const resArray = await Promise.all(getArray);
-
+  // const getArray = [firstPage].concat(
+  //   sampleUrls.map((url) => axiosGit.get(url))
+  // );
   let starHistory = null;
 
-  if (pageIndexes[pageIndexes.length - 1] > sampleNum) {
-    starHistory = pageIndexes.map((p, i) => {
-      return {
-        date: resArray[i + 1].data[0].starred_at.slice(0, 10),
-        starNum: 30 * ((p === 0 ? 1 : p) - 1), // page 0 also means page 1
-      };
-    });
-  } else {
-    // we have every starredEvent: we can use them to generate 15 (sampleNum) precise points
-    const starredEvents = resArray.reduce((acc, r) => acc.concat(r.data), []);
+  // const resArray = await Promise.all(getArray);
 
-    const firstStarredAt = new Date(starredEvents[0].starred_at);
-    const daysSinceRepoCreatedAt = Math.round((new Date()) - firstStarredAt) / (1000*60*60*24);
+  // let starHistory = null;
 
-    const dates = Array.from(new Array(50)).map((_, i) => {
-      const firstStarredAtCopy = new Date(firstStarredAt);
-      firstStarredAtCopy.setDate(firstStarredAtCopy.getDate() + Math.floor((daysSinceRepoCreatedAt / 50) * (i + 1)));
-      return firstStarredAtCopy.toISOString().slice(0, 10);
-    }, []);
+  // let newPages = [7, 15, 23, 32, 40, 48, 56, 64, 72, 80, 88, 97, 105, 113, 121]
+  // console.log(sampleUrls, resArray)
+  // if (newPages[newPages.length - 1] > sampleNum) {
+  //   starHistory = newPages.map((p, i) => {
+  //     return {
+  //       date: resArray[i + 1].data[0].starred_at.slice(0, 10),
+  //       starNum: 30 * ((p === 0 ? 1 : p) - 1), // page 0 also means page 1
+  //     };
+  //   });
+  // } else {
+  //   // we have every starredEvent: we can use them to generate 15 (sampleNum) precise points
+  //   const starredEvents = resArray.reduce((acc, r) => acc.concat(r.data), []);
 
-    starHistory = dates.map((d, i) => {
-      let starNum = 0;
-      const firstStarredEventAfterDate = starredEvents.find((se, i) => {
-        if (se.starred_at.slice(0, 10) >= d) {
-          starNum = i + 1;
-          return true
-        }
+  //   const firstStarredAt = new Date(starredEvents[0].starred_at);
+  //   const daysSinceRepoCreatedAt = Math.round((new Date()) - firstStarredAt) / (1000*60*60*24);
 
-        return false;
-      })
+  //   const dates = Array.from(new Array(50)).map((_, i) => {
+  //     const firstStarredAtCopy = new Date(firstStarredAt);
+  //     firstStarredAtCopy.setDate(firstStarredAtCopy.getDate() + Math.floor((daysSinceRepoCreatedAt / 50) * (i + 1)));
+  //     return firstStarredAtCopy.toISOString().slice(0, 10);
+  //   }, []);
 
-      return firstStarredEventAfterDate && {
-        date: firstStarredEventAfterDate.starred_at.slice(0, 10),
-        starNum: starNum
-      };
-    }).filter(x => x);
-  }
+  //   starHistory = dates.map((d, i) => {
+  //     let starNum = 0;
+  //     const firstStarredEventAfterDate = starredEvents.find((se, i) => {
+  //       if (se.starred_at.slice(0, 10) >= d) {
+  //         starNum = i + 1;
+  //         return true
+  //       }
 
-  // Better view for less star repos (#28) and for repos with too much stars (>40000)
-  const resForStarNum = await axiosGit.get(`https://api.github.com/repos/${repo}`);
-  const starNumToday = resForStarNum.data.stargazers_count;
-  const today = new Date().toISOString().slice(0, 10);
-  starHistory.push({
-    date: today,
-    starNum: starNumToday
-  })
+  //       return false;
+  //     })
+
+  //     return firstStarredEventAfterDate && {
+  //       date: firstStarredEventAfterDate.starred_at.slice(0, 10),
+  //       starNum: starNum
+  //     };
+  //   }).filter(x => x);
+  // }
+
+  // console.log('starHistory', starHistory)
+
+  // // // Better view for less star repos (#28) and for repos with too much stars (>40000)
+  // // const resForStarNum = await axiosGit.get(`https://api.github.com/repos/${repo}`);
+  // // const starNumToday = resForStarNum.data.stargazers_count;
+  // // const today = new Date().toISOString().slice(0, 10);
+  // // starHistory.push({
+  // //   date: today,
+  // //   starNum: starNumToday
+  // // })
 
   return starHistory;
 }

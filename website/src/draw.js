@@ -9,16 +9,17 @@ export default function draw(datasets) {
   new chartXkcd.XY(svg, {
     title: 'Star history',
     yLabel: 'Github stars',
-    xLabel: 'Date',
+    xLabel: 'Start month',
+    labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
     data: {
       datasets
     },    
     options: {
-      xTickCount: 5,
+      xTickCount: 10,
       yTickCount: 5,
       legendPosition: chartXkcd.config.positionType.upLeft,
       showLine: true,
-      timeFormat: 'MM/DD/YYYY',
+      // timeFormat: 'MM/DD/YYYY',
       dotSize: 0.5,
     },
   })
