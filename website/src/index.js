@@ -90,6 +90,7 @@ async function fetchDataAndDraw(repo, token) {
 
   try {
     const starHistory = await getStarHistory(repo, token);
+    console.log('starHistory', starHistory)
     // new data
     data.push({
       label: repo,
