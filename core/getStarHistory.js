@@ -65,7 +65,7 @@ async function getStarHistory(repo, token) {
   const { initUrl, pageNum } = await generateUrls(repo);
 
   let res = [];
-  const EightMonth = 60000 * 60 * 24 * 30 * 8;
+  const EightMonth = 60000 * 60 * 24 * 30 * 36;
   let limit = 0;
   for (var i = 0; i < pageNum; i++) {
     const url = `${initUrl}?page=${i}`;

@@ -4,7 +4,7 @@
   "description": "The missing star history graph of github projects",
   "main": "index.js",
   "scripts": {
-    "startWebsite": "parcel website/index.html",
+    "dev": "parcel website/index.html",
     "buildWebsite": "rm -r dist && parcel build website/index.html --no-source-maps",
     "deployWebsite": "npm run buildWebsite && up deploy production",
     "startExtension": "parcel watch extension/src/index.js -d extension/build",
