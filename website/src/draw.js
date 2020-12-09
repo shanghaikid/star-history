@@ -7,18 +7,19 @@ import chartXkcd from 'chart.xkcd';
 export default function draw(datasets) {
   const svg = document.querySelector('#chart svg');
   new chartXkcd.XY(svg, {
-    title: 'Forks history',
-    yLabel: 'Github forks',
-    xLabel: 'Date',
+    title: 'Star history',
+    yLabel: 'Github stars',
+    xLabel: 'Months since debute',
+    labels: ['0', '1', '2', '3', '4', '5', '6', '7', '8'],
     data: {
       datasets
     },    
     options: {
-      xTickCount: 5,
+      xTickCount: 9,
       yTickCount: 5,
       legendPosition: chartXkcd.config.positionType.upLeft,
       showLine: true,
-      timeFormat: 'MM/DD/YYYY',
+      // timeFormat: 'MM/DD/YYYY',
       dotSize: 0.5,
     },
   })

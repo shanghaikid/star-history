@@ -90,13 +90,12 @@ async function fetchDataAndDraw(repo, token) {
 
   try {
     const starHistory = await getStarHistory(repo, token);
-    console.log('starHistory', starHistory)
     // new data
     data.push({
       label: repo,
-      data: starHistory.map((item) => {
+      data: starHistory.map((item, i) => {
         return {
-          x: new Date(item.date),
+          x: i,
           y: Number(item.starNum)
         }
       }),

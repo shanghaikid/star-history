@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // number of sample requests to do
-const sampleNum = 30;
+const sampleNum = 15;
 
 // return [1,2, ..., n]
 const range = (n) => Array.apply(null, { length: n }).map((_, i) => i + 1);
@@ -13,6 +13,11 @@ const range = (n) => Array.apply(null, { length: n }).map((_, i) => i + 1);
  * @return {Array} history - eg: [{date: 2015-3-1,starNum: 12}, ...]
  */
 async function getStarHistory(repo, token) {
+  var storedHistory = localStorage.getItem(repo);
+  if (storedHistory) {
+    storedHistory = JSON.parse(storedHistory);
+    return storedHistory;
+  }
   const axiosGit = axios.create({
     headers: {
       Accept: "application/vnd.github.v3.star+json",
@@ -37,6 +42,7 @@ async function getStarHistory(repo, token) {
      * rel="last"
      */
     const link = initRes.headers.link;
+
     const pageNum = link ? /next.*?page=(\d*).*?last/.exec(link)[1] : 1; // total page number
 
     // used to calculate total stars for this page
@@ -53,106 +59,74 @@ async function getStarHistory(repo, token) {
     );
 
     console.log("pageIndexes", pageIndexes);
-    return { firstPage: initRes, sampleUrls, pageIndexes };
+    return { firstPage: initRes, sampleUrls, pageIndexes, pageNum, initUrl };
   }
 
-  const { sampleUrls, pageIndexes, firstPage } = await generateUrls(repo);
+  const { initUrl, pageNum } = await generateUrls(repo);
 
-  // promises to request sampleUrls
-  const getArray = [firstPage].concat(
-    sampleUrls.map((url) => axiosGit.get(url))
-  );
+  let res = [];
+  const EightMonth = 60000 * 60 * 24 * 30 * 36;
+  let limit = 0;
+  for (var i = 0; i < pageNum; i++) {
+    const url = `${initUrl}?page=${i}&sort=oldest`;
+    let c = false;
+    const result = await axiosGit.get(url).catch((err) => {
+      c = true;
+    });
+    if (c) {
+      continue;
+    }
+    if (limit === 0) {
+      limit = new Date(result.data[0].created_at).getTime() + EightMonth;
+    }
+    limit = limit > new Date().getTime() ? new Date().getTime() : limit;
+    console.log('start time', new Date(result.data[0].created_at));
+    console.log('limit is', new Date(limit));
+    let b = false;
+    result.data.forEach((star) => {
+      if (new Date(star.created_at).getTime() >= limit) {
+        b = true;
+        return;
+      }
+      res.push(star);
+      console.log(res.length);
+    });
+    if (b) {
+      break;
+    }
+  }
 
-  const resArray = await (await Promise.all(getArray)).reverse();
   let dateMap = {};
-  let res = resArray
-    .map((r) => r.data)
-    .flatMap((r) => r)
-    .filter((r) => r.fork);
+
   res.forEach((point) => {
     dateMap[point.created_at.slice(0, 7)] =
       dateMap[point.created_at.slice(0, 7)] || [];
     dateMap[point.created_at.slice(0, 7)].push(point);
   });
-  let history = [];
+  let history = [
+    {
+      data: 0,
+      starNum: 0,
+    },
+  ];
   let totolCount = 0;
   Object.keys(dateMap)
     .sort()
-    .forEach((key) => {
+    .forEach((key, i) => {
       totolCount += dateMap[key].length;
       history.push({
-        date: key,
+        date: i,
         starNum: totolCount,
       });
     });
 
-  // history.sort((a, b) => {
-  //   if (a.date < b.date) return -1;
-  //   if (a.date > b.date) return 1;
-  // })
-  console.log("totolCount", totolCount, dateMap, resArray);
-  // history.push({
-  //   date: lastMonth,
-  //   starNum: totolCount,
-  // });
-  // console.log(res, dateMap, history);
-  // let starHistory = null;
+  if (repo === "milvus-io/milvus") {
+    history.splice(1, 1);
+  }
 
-  // if (pageIndexes[pageIndexes.length - 1] > sampleNum) {
-  //   starHistory = pageIndexes.map((p, i) => {
-  //     return {
-  //       date: resArray[i + 1].data[0].created_at.slice(0, 10),
-  //       starNum: 30 * ((p === 0 ? 1 : p) - 1), // page 0 also means page 1
-  //     };
-  //   });
-  // } else {
-  //   // we have every starredEvent: we can use them to generate 15 (sampleNum) precise points
-  //   const starredEvents = resArray.reduce((acc, r) => acc.concat(r.data), []);
-  //   const firstStarredAt = new Date(starredEvents[0].created_at);
-  //   const daysSinceRepoCreatedAt =
-  //     Math.round(new Date() - firstStarredAt) / (1000 * 60 * 60 * 24);
+  localStorage.setItem(repo, JSON.stringify(history));
 
-  //   const dates = Array.from(new Array(50)).map((_, i) => {
-  //     const firstStarredAtCopy = new Date(firstStarredAt);
-  //     firstStarredAtCopy.setDate(
-  //       firstStarredAtCopy.getDate() -
-  //         Math.floor((daysSinceRepoCreatedAt / 50) * (i + 1))
-  //     );
-  //     return firstStarredAtCopy.toISOString().slice(0, 10);
-  //   }, []);
-
-  //   starHistory = dates
-  //     .map((d, i) => {
-  //       let starNum = firstStarredAt;
-  //       const firstStarredEventAfterDate = starredEvents.find((se, i) => {
-  //         if (se.created_at.slice(0, 10) >= d) {
-  //           starNum = i - 1;
-  //           return true;
-  //         }
-
-  //         return false;
-  //       });
-
-  //       return (
-  //         firstStarredEventAfterDate && {
-  //           date: firstStarredEventAfterDate.created_at.slice(0, 10),
-  //           starNum: starNum,
-  //         }
-  //       );
-  //     })
-  //     .filter((x) => x);
-  // }
-
-  // Better view for less star repos (#28) and for repos with too much stars (>40000)
-  const resForStarNum = await axiosGit.get(
-    `https://api.github.com/repos/${repo}`
-  );
-  const starNumToday = resForStarNum.data.forks;
-  const today = new Date().toISOString().slice(0, 10);
-  history.push({
-    date: today,
-    starNum: starNumToday,
-  });
+  console.log(dateMap);
 
   return history;
 }
